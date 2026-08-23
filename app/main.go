@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"net"
+
+	"github.com/rahulrao0209/build-your-own-dns-server/types"
 )
 
 var _ = net.ListenUDP
@@ -33,9 +36,35 @@ func main() {
 		}
 
 		receivedData := string(buf[:size])
+
+		packetId := binary.BigEndian.Uint16(buf[0:2])
 		fmt.Printf("Received %d bytes from %s: %s\n", size, source, receivedData)
 
-		response := []byte{}
+		// Create an empty response
+		message := &types.DNSMessage{
+			Header: types.Header{
+				PacketIdentifier:      packetId,
+				ResponseIndicator:     1,
+				OperationCode:         0,
+				AuthoritativeAnswer:   0,
+				Truncation:            0,
+				RecursionDesired:      0,
+				RecursionAvailable:    0,
+				Reserved:              0,
+				ResponseCode:          0,
+				QuestionCount:         0,
+				AnswerRecordCount:     0,
+				AuthorityRecordCount:  0,
+				AdditionalRecordCount: 0,
+			},
+		}
+
+		marshalledDNSMessage, err := message.MarshalBinary()
+		if err != nil {
+			return
+		}
+
+		response := marshalledDNSMessage
 
 		_, err = udpConn.WriteToUDP(response, source)
 		if err != nil {
