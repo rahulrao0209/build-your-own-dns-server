@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net"
 
 	"github.com/rahulrao0209/build-your-own-dns-server/types"
-	"github.com/rahulrao0209/build-your-own-dns-server/utils"
 )
 
 var _ = net.ListenUDP
@@ -36,51 +36,23 @@ func main() {
 		}
 
 		receivedData := string(buf[:size])
-
-		/* Decode DNS client messasge */
-		// from header section
-		packetId := utils.DecodePacketId(buf[:size])
-		questionCount := utils.DecodeQuestionCount(buf[:size])
-
-		// question section
-		domain, qTypeIdx := utils.DecodeDomainName(buf[12:])
-		qtype := utils.DecodeType(buf[12:], qTypeIdx)  // QTYPE occupies the next 2 bytes after domain name
-		class := utils.DecodeClass(buf[12:], qTypeIdx) // CLASS occupies the next 2 bytes after QTYPE
-
 		fmt.Printf("Received %d bytes from %s: %s\n", size, source, receivedData)
 
-		// Create an empty response
-		message := &types.DNSMessage{
-			Header: types.Header{
-				PacketIdentifier:      packetId,
-				ResponseIndicator:     1,
-				OperationCode:         0,
-				AuthoritativeAnswer:   0,
-				Truncation:            0,
-				RecursionDesired:      0,
-				RecursionAvailable:    0,
-				Reserved:              0,
-				ResponseCode:          0,
-				QuestionCount:         questionCount,
-				AnswerRecordCount:     0,
-				AuthorityRecordCount:  0,
-				AdditionalRecordCount: 0,
-			},
-			Question: types.Question{
-				Name:  domain,
-				Type:  qtype,
-				Class: class,
-			},
-		}
+		// Received DNS Query
+		dnsQuery := buf[:size]
 
-		marshalledDNSMessage, err := message.MarshalBinary()
+		/* Decode DNS client query and assemble a reply */
+		var dnsReply *types.DNSMessage = &types.DNSMessage{}
+		dnsReply, err = dnsReply.UnmarshalBinary(dnsQuery)
+
+		// Encode DNS reply
+		marshalledDNSReply, err := dnsReply.MarshalBinary()
 		if err != nil {
+			log.Fatal("Error encoding DNS reply")
 			return
 		}
 
-		response := marshalledDNSMessage
-
-		_, err = udpConn.WriteToUDP(response, source)
+		_, err = udpConn.WriteToUDP(marshalledDNSReply, source)
 		if err != nil {
 			fmt.Println("Failed to send response:", err)
 		}
