@@ -42,7 +42,7 @@ func main() {
 		dnsQuery := buf[:size]
 
 		/* Decode DNS client query and assemble a reply */
-		var dnsReply *types.DNSMessage = &types.DNSMessage{}
+		dnsReply := &types.DNSMessage{}
 		dnsReply, err = dnsReply.UnmarshalBinary(dnsQuery)
 
 		// Encode DNS reply

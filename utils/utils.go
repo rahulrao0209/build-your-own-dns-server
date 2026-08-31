@@ -1,7 +1,10 @@
+// Utilities for encoding and decoding the contents of a DNS message
 package utils
 
 import (
+	"bytes"
 	"encoding/binary"
+	"errors"
 	"strings"
 )
 
@@ -36,6 +39,40 @@ func DecodeDomainName(buf []byte) (string, int) {
 		i += length
 	}
 	return strings.Join(labels, "."), offset
+}
+
+func EncodeDomainName(buf *bytes.Buffer, name string) error {
+	labels := strings.Split(name, ".")
+	for _, l := range labels {
+		if len(l) > 63 {
+			return errors.New("label too long")
+		}
+
+		// encode each label in the format: length content
+		buf.WriteByte(byte(len(l)))
+		buf.WriteString(l)
+	}
+	// terminate the label with a zero byte
+	buf.WriteByte(0)
+	return nil
+}
+
+func AppendNBytes(buf *bytes.Buffer, n int, data any) error {
+	var tmp = make([]byte, n)
+
+	switch v := data.(type) {
+	case uint16:
+		binary.BigEndian.PutUint16(tmp[:], v)
+	case uint32:
+		binary.BigEndian.PutUint32(tmp[:], v)
+	case [4]byte:
+		// Appends to the end of the a byte slice and therefore requires
+		// a new zero length slice to avoid appending the data after the length.
+		tmp, _ = binary.Append([]byte{}, binary.BigEndian, v)
+	}
+
+	buf.Write(tmp[:])
+	return nil
 }
 
 // Decodes record type a.k.a QType from a DNS request's question section.

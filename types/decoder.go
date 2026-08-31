@@ -43,7 +43,7 @@ func (h *Header) UnmarshalBinary(queryheader []byte) (Header, error) {
 		Reserved:              0,
 		ResponseCode:          0,
 		QuestionCount:         questionCount,
-		AnswerRecordCount:     0,
+		AnswerRecordCount:     1,
 		AuthorityRecordCount:  0,
 		AdditionalRecordCount: 0,
 	}
