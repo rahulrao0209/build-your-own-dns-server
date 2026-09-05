@@ -5,31 +5,36 @@ import (
 	"encoding/binary"
 
 	"github.com/rahulrao0209/build-your-own-dns-server/data"
-	"github.com/rahulrao0209/build-your-own-dns-server/utils"
 )
 
 func (m *DNSMessage) MarshalBinary() ([]byte, error) {
 	var buf bytes.Buffer
-
-	// Encode DNS reply header section
-	header, err := m.Header.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-	buf.Write(header)
 
 	// Encode DNS reply question section
 	question, err := m.Question.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
-	buf.Write(question)
 
 	// Encode DNS reply answer section
-	answer, err := m.Answer.MarshalBinary(m.Question)
+	answer, err := m.Answer.MarshalBinary(&m.Header, m.Question)
 	if err != nil {
 		return nil, err
 	}
+
+	// Encode DNS reply header section
+	// Note: header is encoded at the end because some sections of the header
+	// depend upon the question and answer sections
+	// ex: The answerRecordCount in the header depends on whether the server
+	// has an answer for the query which is determined in the encoding method for the answer.
+	header, err := m.Header.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+
+	// Write all sections
+	buf.Write(header)
+	buf.Write(question)
 	buf.Write(answer)
 
 	return buf.Bytes(), nil
@@ -39,12 +44,21 @@ func (h *Header) MarshalBinary() ([]byte, error) {
 	buf := make([]byte, 12)
 
 	// marshal header
-	flags := uint16(h.ResponseIndicator)<<15 |
-		uint16(h.OperationCode)<<11 |
-		uint16(h.AuthoritativeAnswer)<<10 |
-		uint16(h.Truncation)<<9 |
-		uint16(h.RecursionDesired)<<8 |
-		uint16(h.ResponseCode)
+
+	// set flags
+	h.ResponseIndicator = 1 // Reply packet
+	h.AuthoritativeAnswer = 0
+	h.Truncation = 0
+	h.RecursionAvailable = 0
+	h.Reserved = 0
+
+	if h.OperationCode == 0 {
+		h.ResponseCode = 0 // no error if opcode is 0
+	} else {
+		h.ResponseCode = 4 // not implemented
+	}
+
+	flags := EncodeFlags(h.Flags)
 
 	binary.BigEndian.PutUint16(buf[0:2], h.PacketIdentifier)
 	binary.BigEndian.PutUint16(buf[2:4], flags)
@@ -60,16 +74,16 @@ func (q *Question) MarshalBinary() ([]byte, error) {
 	var buf bytes.Buffer
 
 	// encode domain name
-	err := utils.EncodeDomainName(&buf, q.Name)
+	err := EncodeDomainName(&buf, q.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	// encode type
-	err = utils.AppendNBytes(&buf, 2, q.Type)
+	err = AppendNBytes(&buf, 2, q.Type)
 
 	// encode class
-	err = utils.AppendNBytes(&buf, 2, q.Class)
+	err = AppendNBytes(&buf, 2, q.Class)
 
 	if err != nil {
 		return nil, err
@@ -78,23 +92,31 @@ func (q *Question) MarshalBinary() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (a *Answer) MarshalBinary(q Question) ([]byte, error) {
+func (a *Answer) MarshalBinary(h *Header, q Question) ([]byte, error) {
 	var buf bytes.Buffer
 
 	domainName := q.Name
 	qtype := q.Type
 	class := q.Class
+
+	_, ok := data.Mock[domainName]
+	// only expecting a single answer as per the mock data.
+	if !ok {
+		h.AnswerRecordCount = 0
+	} else {
+		h.AnswerRecordCount = 1
+	}
 	ttl := data.Mock[domainName].TTL
 	rDataLength := data.Mock[domainName].Length
 	rData := data.Mock[domainName].Data
 
 	// encode values
-	utils.EncodeDomainName(&buf, domainName)
-	utils.AppendNBytes(&buf, 2, qtype)
-	utils.AppendNBytes(&buf, 2, class)
-	utils.AppendNBytes(&buf, 4, ttl)
-	utils.AppendNBytes(&buf, 2, rDataLength)
-	err := utils.AppendNBytes(&buf, 4, rData)
+	EncodeDomainName(&buf, domainName)
+	AppendNBytes(&buf, 2, qtype)
+	AppendNBytes(&buf, 2, class)
+	AppendNBytes(&buf, 4, ttl)
+	AppendNBytes(&buf, 2, rDataLength)
+	err := AppendNBytes(&buf, 4, rData)
 
 	if err != nil {
 		return nil, err

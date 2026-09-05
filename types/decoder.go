@@ -1,7 +1,7 @@
 package types
 
 import (
-	"github.com/rahulrao0209/build-your-own-dns-server/utils"
+	"github.com/rahulrao0209/build-your-own-dns-server/constants"
 )
 
 func (m *DNSMessage) UnmarshalBinary(query []byte) (*DNSMessage, error) {
@@ -29,32 +29,38 @@ func (m *DNSMessage) UnmarshalBinary(query []byte) (*DNSMessage, error) {
 }
 
 func (h *Header) UnmarshalBinary(queryheader []byte) (Header, error) {
-	packetId := utils.DecodePacketId(queryheader)
-	questionCount := utils.DecodeQuestionCount(queryheader)
+	packetId := DecodePacketId(queryheader)
+	questionCount := DecodeQuestionCount(queryheader)
+	flagDecoder := DecodeFlags(queryheader)
+	answerRecordCount := DecodeAnswerRecordCount(queryheader)
+	authorityRecordCount := DecodeAuthorityRecordCount(queryheader)
+	additionalRecordCount := DecodeAdditionalRecordCount(queryheader)
 
 	header := Header{
-		PacketIdentifier:      packetId,
-		ResponseIndicator:     1,
-		OperationCode:         0,
-		AuthoritativeAnswer:   0,
-		Truncation:            0,
-		RecursionDesired:      0,
-		RecursionAvailable:    0,
-		Reserved:              0,
-		ResponseCode:          0,
+		PacketIdentifier: packetId,
+		Flags: Flags{
+			ResponseIndicator:   flagDecoder(constants.QR),
+			OperationCode:       flagDecoder(constants.OPCODE),
+			AuthoritativeAnswer: flagDecoder(constants.AA),
+			Truncation:          flagDecoder(constants.TC),
+			RecursionDesired:    flagDecoder(constants.RD),
+			RecursionAvailable:  flagDecoder(constants.RA),
+			Reserved:            flagDecoder(constants.ZZZ),
+			ResponseCode:        flagDecoder(constants.RCODE),
+		},
 		QuestionCount:         questionCount,
-		AnswerRecordCount:     1,
-		AuthorityRecordCount:  0,
-		AdditionalRecordCount: 0,
+		AnswerRecordCount:     answerRecordCount,
+		AuthorityRecordCount:  authorityRecordCount,
+		AdditionalRecordCount: additionalRecordCount,
 	}
 
 	return header, nil
 }
 
 func (q *Question) UnmarshalBinary(queryQuestion []byte, questionCount int) (Question, int, error) {
-	domainName, offset := utils.DecodeDomainName(queryQuestion)
-	qType, offset := utils.DecodeType(queryQuestion, offset)
-	class, offset := utils.DecodeClass(queryQuestion, offset)
+	domainName, offset := DecodeDomainName(queryQuestion)
+	qType, offset := DecodeType(queryQuestion, offset)
+	class, offset := DecodeClass(queryQuestion, offset)
 
 	question := Question{
 		Name:  domainName,

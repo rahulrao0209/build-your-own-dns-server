@@ -1,22 +1,75 @@
 // Utilities for encoding and decoding the contents of a DNS message
-package utils
+package types
 
 import (
 	"bytes"
 	"encoding/binary"
 	"errors"
 	"strings"
+
+	"github.com/rahulrao0209/build-your-own-dns-server/constants"
 )
 
-// Decodes packet ID from a DNS request's header section.
+/* ******** HEADER SECTION UTILS ******* */
 func DecodePacketId(buf []byte) uint16 {
 	return binary.BigEndian.Uint16(buf[0:2])
+}
+
+func DecodeFlags(buf []byte) func(constants.Flag) uint8 {
+	flags := binary.BigEndian.Uint16(buf[2:4])
+
+	return func(flag constants.Flag) uint8 {
+		switch flag {
+		case constants.QR:
+			return uint8((flags >> 15) & 0x1)
+		case constants.OPCODE:
+			return uint8((flags >> 11) & 0xF)
+		case constants.AA:
+			return uint8((flags >> 10) & 0x1)
+		case constants.TC:
+			return uint8((flags >> 9) & 0x1)
+		case constants.RD:
+			return uint8((flags >> 8) & 0x1)
+		case constants.RA:
+			return uint8((flags >> 7) & 0x1)
+		case constants.ZZZ:
+			return uint8((flags >> 4) & 0x7)
+		case constants.RCODE:
+			return uint8(flags & 0xF)
+		default: // should ideally never hit this case
+			return 0
+		}
+	}
+}
+
+func EncodeFlags(flags Flags) uint16 {
+	return uint16(flags.ResponseIndicator)<<15 |
+		uint16(flags.OperationCode)<<11 |
+		uint16(flags.AuthoritativeAnswer)<<10 |
+		uint16(flags.Truncation)<<9 |
+		uint16(flags.RecursionDesired)<<8 |
+		uint16(flags.RecursionAvailable)<<7 |
+		uint16(flags.Reserved)<<4 |
+		uint16(flags.ResponseCode)
 }
 
 func DecodeQuestionCount(buf []byte) uint16 {
 	return binary.BigEndian.Uint16(buf[4:6])
 }
 
+func DecodeAnswerRecordCount(buf []byte) uint16 {
+	return binary.BigEndian.Uint16(buf[6:8])
+}
+
+func DecodeAuthorityRecordCount(buf []byte) uint16 {
+	return binary.BigEndian.Uint16(buf[8:10])
+}
+
+func DecodeAdditionalRecordCount(buf []byte) uint16 {
+	return binary.BigEndian.Uint16(buf[10:12])
+}
+
+/* ******** QUESTION SECTION  UTILS ******* */
 // Decodes domain name from a DNS request's question section
 // ex: banana.com
 // 06 b  a  n  a  n  a  03 c  o  m
