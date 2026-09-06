@@ -57,16 +57,26 @@ func (h *Header) UnmarshalBinary(queryheader []byte) (Header, error) {
 	return header, nil
 }
 
-func (q *Question) UnmarshalBinary(queryQuestion []byte, questionCount int) (Question, int, error) {
-	domainName, offset := DecodeDomainName(queryQuestion)
-	qType, offset := DecodeType(queryQuestion, offset)
-	class, offset := DecodeClass(queryQuestion, offset)
+func (q Questions) UnmarshalBinary(queryQuestion []byte, questionCount int) ([]Question, int, error) {
+	offset := 0
+	questions := make([]Question, 0, questionCount)
 
-	question := Question{
-		Name:  domainName,
-		Type:  qType,
-		Class: class,
+	var domainName string
+	var qType uint16
+	var class uint16
+	for range questionCount {
+		domainName, offset = DecodeDomainName(queryQuestion, offset)
+		qType, offset = DecodeType(queryQuestion, offset)
+		class, offset = DecodeClass(queryQuestion, offset)
+
+		question := Question{
+			Name:  domainName,
+			Type:  qType,
+			Class: class,
+		}
+
+		questions = append(questions, question)
 	}
 
-	return question, offset, nil
+	return questions, offset, nil
 }

@@ -28,6 +28,8 @@ type Question struct {
 	Class uint16 // (2 bytes) Record class (ex: 1 for IN)
 }
 
+type Questions []Question // Multiple question DNS messages are legal at the wire-format level but unusual in practice.
+
 type Answer struct {
 	Name   string  // (variable) Domain name encoded as a sequence of labels
 	Type   uint16  // (2 bytes) Record type (ex: 1 for A record, 5 for CNAME)
@@ -39,6 +41,6 @@ type Answer struct {
 
 type DNSMessage struct {
 	Header   Header
-	Question Question
+	Question Questions
 	Answer   Answer
 }

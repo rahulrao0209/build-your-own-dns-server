@@ -70,56 +70,62 @@ func (h *Header) MarshalBinary() ([]byte, error) {
 	return buf, nil
 }
 
-func (q *Question) MarshalBinary() ([]byte, error) {
+func (q *Questions) MarshalBinary() ([]byte, error) {
 	var buf bytes.Buffer
 
-	// encode domain name
-	err := EncodeDomainName(&buf, q.Name)
-	if err != nil {
-		return nil, err
-	}
+	for _, qu := range *q {
+		// encode domain name
+		err := EncodeDomainName(&buf, qu.Name)
+		if err != nil {
+			return nil, err
+		}
 
-	// encode type
-	err = AppendNBytes(&buf, 2, q.Type)
+		// encode type
+		err = AppendNBytes(&buf, 2, qu.Type)
 
-	// encode class
-	err = AppendNBytes(&buf, 2, q.Class)
+		// encode class
+		err = AppendNBytes(&buf, 2, qu.Class)
 
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
+
 	}
 
 	return buf.Bytes(), nil
 }
 
-func (a *Answer) MarshalBinary(h *Header, q Question) ([]byte, error) {
+func (a *Answer) MarshalBinary(h *Header, q Questions) ([]byte, error) {
 	var buf bytes.Buffer
 
-	domainName := q.Name
-	qtype := q.Type
-	class := q.Class
+	for _, qu := range q {
+		domainName := qu.Name
+		qtype := qu.Type
+		class := qu.Class
 
-	_, ok := data.Mock[domainName]
-	// only expecting a single answer as per the mock data.
-	if !ok {
-		h.AnswerRecordCount = 0
-	} else {
-		h.AnswerRecordCount = 1
-	}
-	ttl := data.Mock[domainName].TTL
-	rDataLength := data.Mock[domainName].Length
-	rData := data.Mock[domainName].Data
+		var ttl uint32
+		var rDataLength uint16
+		var rData [4]byte
+		dname, ok := data.Mock[domainName]
+		if ok {
+			h.AnswerRecordCount++
+			ttl = dname.TTL
+			rDataLength = dname.Length
+			rData = dname.Data
+		}
 
-	// encode values
-	EncodeDomainName(&buf, domainName)
-	AppendNBytes(&buf, 2, qtype)
-	AppendNBytes(&buf, 2, class)
-	AppendNBytes(&buf, 4, ttl)
-	AppendNBytes(&buf, 2, rDataLength)
-	err := AppendNBytes(&buf, 4, rData)
+		// encode values
+		EncodeDomainName(&buf, domainName)
+		AppendNBytes(&buf, 2, qtype)
+		AppendNBytes(&buf, 2, class)
+		AppendNBytes(&buf, 4, ttl)
+		AppendNBytes(&buf, 2, rDataLength)
+		err := AppendNBytes(&buf, 4, rData)
 
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
+
 	}
 
 	return buf.Bytes(), nil

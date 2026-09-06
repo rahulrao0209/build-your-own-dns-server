@@ -75,11 +75,10 @@ func DecodeAdditionalRecordCount(buf []byte) uint16 {
 // 06 b  a  n  a  n  a  03 c  o  m
 // 06 62 61 6e 61 6e 61 03 63 6f 6d 00
 // 0. 1. 2. 3. 4. 5. 6. 7. 8. 9. 10. 11
-func DecodeDomainName(buf []byte) (string, int) {
+func DecodeDomainName(buf []byte, offset int) (string, int) {
 	var labels []string
-	var offset int
 
-	for i := 0; i < len(buf); {
+	for i := offset; i < len(buf); {
 		length := int(buf[i])
 		i++
 
