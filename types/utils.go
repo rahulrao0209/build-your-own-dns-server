@@ -93,6 +93,52 @@ func DecodeDomainName(buf []byte, offset int) (string, int) {
 	return strings.Join(labels, "."), offset
 }
 
+// Decodes a DNS domain name from the wire format, supporting both uncompressed
+// labels and compression pointers. Uncompressed names are read label-by-label
+// until a zero byte. A compression pointer references a previously encoded name
+// elsewhere in the DNS message; the pointer is followed to reconstruct the name,
+// while the returned offset remains positioned after the pointer in the current
+// record so the caller can continue decoding subsequent fields.
+func DecodeDomainNameWithCompression(buf []byte, offset int) (string, int) {
+	var labels []string
+	i := offset      // where we're currently reading the domain name
+	nextOffset := -1 // where the rest of the parser should continue after the domain name
+
+	for {
+		length := buf[i]
+
+		// Compression pointer
+		if length&0xC0 == 0xC0 {
+			// Compression pointer occupies two bytes
+			pointer := (uint16(buf[i])&0x3F)<<8 | uint16(buf[i+1])
+
+			// Surrounding DNS record continues after C0 XX
+			if nextOffset == -1 {
+				nextOffset = i + 2 // compression pointer occupies two bytes
+			}
+
+			// Jump to where the rest of the name is stored
+			i = int(pointer)
+			continue
+		}
+
+		if length == 0 { // end of domain name is marked by zero byte
+			if nextOffset == -1 {
+				nextOffset = i + 1
+			}
+			break
+		}
+
+		// Normal label
+		// lbls, i = DecodeDomainName(buf, nextOffset)
+		i++
+		labels = append(labels, string(buf[i:i+int(length)]))
+		i += int(length)
+	}
+
+	return strings.Join(labels, "."), nextOffset
+}
+
 func EncodeDomainName(buf *bytes.Buffer, name string) error {
 	labels := strings.Split(name, ".")
 	for _, l := range labels {

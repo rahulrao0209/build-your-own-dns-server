@@ -65,7 +65,7 @@ func (q Questions) UnmarshalBinary(queryQuestion []byte, questionCount int) ([]Q
 	var qType uint16
 	var class uint16
 	for range questionCount {
-		domainName, offset = DecodeDomainName(queryQuestion, offset)
+		domainName, offset = DecodeDomainNameWithCompression(queryQuestion, offset)
 		qType, offset = DecodeType(queryQuestion, offset)
 		class, offset = DecodeClass(queryQuestion, offset)
 
